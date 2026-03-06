@@ -1,0 +1,68 @@
+import React from 'react';
+import { useStore } from '../../contexts/StoreContext';
+
+export default function StoreInfo() {
+    const { store } = useStore();
+
+    if (!store) {
+        return null; // 스토어 정보가 없을 경우 안전한 최소 가드
+    }
+
+    // 가게명 fallback: 온족 전용앱을 가정하여 기본값 설정
+    const storeName = store.name || "온족";
+
+    // 운영 배너: 일시정지인 경우에만 사유 표시
+    const isPaused = store.isOrderingPaused;
+    const pausedReason = store.pausedReason || "현재 주문을 잠시 받지 않고 있습니다.";
+
+    // 가게 소개글
+    const description = store.description;
+
+    // 배달 정보
+    const deliveryFee = store.deliveryFee;
+    const minOrder = store.minOrderAmount;
+    const deliveryTime = store.settings?.estimatedDeliveryTime;
+
+    return (
+        <div className="bg-white px-4 py-5 mb-2 shadow-sm">
+            {/* 1. 운영 배너 (긴급 공지, 우선순위 높음) */}
+            {isPaused && (
+                <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm font-medium">
+                    🚨 {pausedReason}
+                </div>
+            )}
+
+            {/* 2. 가게명 */}
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{storeName}</h1>
+
+            {/* 3. 소개글 (최대 2줄) */}
+            {description && (
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                    {description}
+                </p>
+            )}
+
+            {/* 4. 배달 정보 가로 정렬 */}
+            <div className="flex flex-wrap items-center gap-y-2 text-sm text-gray-700">
+                {deliveryTime != null && (
+                    <div className="flex items-center mr-4">
+                        <span className="text-gray-500 mr-1">배달시간</span>
+                        <span className="font-semibold">약 {deliveryTime}분</span>
+                    </div>
+                )}
+                {minOrder != null && (
+                    <div className="flex items-center mr-4">
+                        <span className="text-gray-500 mr-1">최소주문</span>
+                        <span className="font-semibold">{minOrder.toLocaleString()}원</span>
+                    </div>
+                )}
+                {deliveryFee != null && (
+                    <div className="flex items-center">
+                        <span className="text-gray-500 mr-1">배달팁</span>
+                        <span className="font-semibold">{deliveryFee.toLocaleString()}원</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
