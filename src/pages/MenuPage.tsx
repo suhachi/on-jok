@@ -8,6 +8,8 @@ import { useFirestoreCollection } from '../hooks/useFirestoreCollection';
 import { getAllMenusQuery } from '../services/menuService';
 import { Menu } from '../types/menu';
 import ReviewPreview from '../components/review/ReviewPreview';
+import StoreInfo from '../components/home/StoreInfo';
+import RecommendedMenu from '../components/home/RecommendedMenu';
 
 export default function MenuPage() {
   const { store } = useStore();
@@ -47,6 +49,9 @@ export default function MenuPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
+      <StoreInfo />
+      <RecommendedMenu menus={menus || null} />
+
       <CategoryBar selected={selectedCategory} onSelect={setSelectedCategory} />
 
       <div className="py-6">
