@@ -8,7 +8,7 @@ export default function StoreInfo() {
     const storeName = store?.name || "온족";
 
     // 운영 배너: 일시정지인 경우에만 사유 표시
-    const isPaused = store?.isOrderingPaused;
+    const isPaused = 'isPaused' in (store || {}) ? !!(store as any).isPaused : !!store?.isOrderingPaused;
     const pausedReason = store?.pausedReason || "현재 주문을 잠시 받지 않고 있습니다.";
 
     // 가게 소개글
@@ -19,8 +19,41 @@ export default function StoreInfo() {
     const minOrder = store?.minOrderAmount;
     const deliveryTime = store?.settings?.estimatedDeliveryTime;
 
+    // StorePromo 필드 (SSOT v4)
+    const promoImages = (store as any)?.promoImages as string[] | undefined;
+    const promoTitle = (store as any)?.promoTitle as string | undefined;
+    const promoText = (store as any)?.promoText as string | undefined;
+
+    const hasPromoImages = promoImages && promoImages.length > 0;
+    const hasPromoText = Boolean(promoTitle || promoText);
+
     return (
-        <div className="bg-white px-4 py-5 mb-2 shadow-sm">
+        <div className="bg-white px-4 py-5 mb-2 shadow-sm overflow-hidden">
+            {/* P1: StorePromo 홍보 이미지 캐러셀/배너 */}
+            {hasPromoImages && (
+                <div className="mb-6 -mx-4 px-4 overflow-x-auto snap-x snap-mandatory flex gap-3 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    {promoImages.length === 1 ? (
+                        <div className="w-full shrink-0 snap-center rounded-xl overflow-hidden shadow-sm">
+                            <img src={promoImages[0]} alt="가게 홍보 이미지" className="w-full aspect-video object-cover" />
+                        </div>
+                    ) : (
+                        promoImages.map((url, idx) => (
+                            <div key={idx} className="w-[85%] shrink-0 snap-center rounded-xl overflow-hidden shadow-sm">
+                                <img src={url} alt={`가게 홍보 이미지 ${idx + 1}`} className="w-full aspect-video object-cover" />
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+
+            {/* P1: StorePromo 홍보글 */}
+            {hasPromoText && (
+                <div className="mb-6 bg-primary-50 px-4 py-4 rounded-xl border border-primary-100">
+                    {promoTitle && <h3 className="font-bold text-primary-900 mb-1">{promoTitle}</h3>}
+                    {promoText && <p className="text-sm text-primary-800 whitespace-pre-line">{promoText}</p>}
+                </div>
+            )}
+
             {/* 1. 운영 배너 (긴급 공지, 우선순위 높음) */}
             {isPaused && (
                 <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm font-medium">
