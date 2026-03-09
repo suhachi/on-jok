@@ -1,0 +1,2164 @@
+﻿# 09-Components-Features
+
+Files: 16
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\admin\AdminOrderAlert.tsx
+
+Size: 3.88 KB
+
+```
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useStore } from '../../contexts/StoreContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useFirestoreCollection } from '../../hooks/useFirestoreCollection';
+import { getAllOrdersQuery } from '../../services/orderService';
+import { Order } from '../../types/order';
+import { toast } from 'sonner';
+
+export default function AdminOrderAlert() {
+    const { store } = useStore();
+    const { isAdmin } = useAuth();
+    const navigate = useNavigate();
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const [lastOrderCount, setLastOrderCount] = useState<number>(0);
+
+    // 전체 주문을 구독하여 새 주문 감지
+    // 관리자가 아니거나 상점이 없으면 query는 null이 되어 구독하지 않음
+    const { data: orders } = useFirestoreCollection<Order>(
+        (isAdmin && store?.id) ? getAllOrdersQuery(store.id) : null
+    );
+
+    useEffect(() => {
+        // Initialize audio with custom file source
+        audioRef.current = new Audio('/notification.mp3');
+        // Preload to ensure readiness
+        audioRef.current.load();
+    }, []);
+
+    useEffect(() => {
+        if (!orders || !isAdmin) return;
+
+        // 초기 로딩 시에는 알림 울리지 않음
+        if (lastOrderCount === 0 && orders.length > 0) {
+            setLastOrderCount(orders.length);
+            return;
+        }
+
+        // 새 주문이 추가된 경우
+        if (orders.length > lastOrderCount) {
+            const newOrdersCount = orders.length - lastOrderCount;
+            const latestOrder = orders[0]; // 정렬이 최신순이라면
+
+            // 알림음 재생 시도
+            // 알림음 반복 재생 설정
+            if (audioRef.current) {
+                audioRef.current.loop = true; // 반복 재생
+                audioRef.current.currentTime = 0;
+
+                const playPromise = audioRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.error('Audio playback failed:', error);
+                    });
+                }
+            }
+
+            // 지속적인 팝업 (확인 버튼 누를 때까지 유지)
+            toast.message('새로운 주문이 도착했습니다! 🔔', {
+                description: `${latestOrder.items[0].name} 외 ${latestOrder.items.length - 1}건 (${latestOrder.totalPrice.toLocaleString()}원)`,
+                duration: Infinity, // 무한 지속
+                action: {
+                    label: '확인',
+                    onClick: () => {
+                        // 확인 버튼 클릭 시 소리 끄기 및 페이지 이동
+                        if (audioRef.current) {
+                            audioRef.current.pause();
+                            audioRef.current.currentTime = 0;
+                        }
+                        navigate('/admin/orders');
+                    }
+                },
+                // 닫기 버튼 등으로 닫혔을 때 소리 끄기 (Sonner API에 따라 동작 다를 수 있음. 안전장치)
+                onDismiss: () => {
+                    if (audioRef.current) {
+                        audioRef.current.pause();
+                        audioRef.current.currentTime = 0;
+                    }
+                },
+                onAutoClose: () => { // 혹시나 자동 닫힘 발생 시
+                    if (audioRef.current) {
+                        audioRef.current.pause();
+                        audioRef.current.currentTime = 0;
+                    }
+                }
+            });
+        }
+        setLastOrderCount(orders.length); // Update count
+    }, [orders, lastOrderCount, isAdmin, navigate]);
+
+    if (!isAdmin) return null;
+
+    return null; // UI 없음
+}
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\admin\AdminSidebar.tsx
+
+Size: 2.83 KB
+
+```
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { LayoutDashboard, UtensilsCrossed, Package, Ticket, Star, Bell, Calendar, Settings, Home, TrendingUp, Users } from 'lucide-react';
+import { useStore } from '../../contexts/StoreContext';
+
+interface AdminSidebarProps {
+  className?: string;
+}
+
+export default function AdminSidebar({ className = '' }: AdminSidebarProps) {
+  const location = useLocation();
+  const { store } = useStore();
+
+  const menuItems = [
+    { path: '/admin', icon: <LayoutDashboard className="w-5 h-5" />, label: '대시보드', exact: true },
+    { path: '/admin/orders', icon: <Package className="w-5 h-5" />, label: '주문 관리' },
+    { path: '/admin/menus', icon: <UtensilsCrossed className="w-5 h-5" />, label: '메뉴 관리' },
+    { path: '/admin/coupons', icon: <Ticket className="w-5 h-5" />, label: '쿠폰 관리' },
+    { path: '/admin/reviews', icon: <Star className="w-5 h-5" />, label: '리뷰 관리' },
+    { path: '/admin/notices', icon: <Bell className="w-5 h-5" />, label: '공지사항 관리' },
+    { path: '/admin/events', icon: <Calendar className="w-5 h-5" />, label: '이벤트 관리' },
+    { path: '/admin/members', icon: <Users className="w-5 h-5" />, label: '회원 관리' },
+    { path: '/admin/stats', icon: <TrendingUp className="w-5 h-5" />, label: '매출 통계' },
+    { path: '/admin/store-settings', icon: <Settings className="w-5 h-5" />, label: '상점 설정' },
+  ];
+
+  const isActive = (path: string, exact = false) => {
+    if (exact) {
+      return location.pathname === path;
+    }
+    return location.pathname.startsWith(path);
+  };
+
+  return (
+    <aside className={`w-52 bg-white border-r border-gray-200 min-h-screen flex-shrink-0 ${className}`}>
+      <div className="p-4">
+        {/* 로고 영역 */}
+        {/* 로고 영역 제거됨 */}
+
+        <nav className="space-y-1">
+          {menuItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`
+                flex items-center space-x-2 px-3 py-2.5 rounded-lg transition-all
+                ${isActive(item.path, item.exact)
+                  ? 'gradient-primary text-white shadow-md'
+                  : 'text-gray-700 hover:bg-gray-100'
+                }
+              `}
+            >
+              {item.icon}
+              <span className="font-medium text-sm">{item.label}</span>
+            </Link>
+          ))}
+        </nav>
+
+        <div className="mt-8 pt-8 border-t border-gray-200">
+          <Link
+            to="/"
+            className="flex items-center space-x-2 px-3 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg transition-all"
+          >
+            <Home className="w-5 h-5" />
+            <span className="font-medium text-sm">사용자 페이지</span>
+          </Link>
+        </div>
+      </div>
+    </aside>
+  );
+}
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\admin\Receipt.tsx
+
+Size: 8.82 KB
+
+```
+import { Order } from '../../types/order';
+import { Store } from '../../types/store';
+
+interface ReceiptProps {
+    order: Order | null;
+    store: Store | null;
+}
+
+export default function Receipt({ order, store }: ReceiptProps) {
+    if (!order) return null;
+
+    // 1. 날짜 포맷팅 (YYYY. MM. DD. 오후 h:mm)
+    const formatDate = (date: any) => {
+        const d = date?.toDate ? date.toDate() : new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0'); // User example uses 12 (no spacing, just number)
+        // Actually user example: 25. 12. 10. 오후 01:08
+        // Let's match typical Korean format: YYYY. MM. DD. 
+        const day = String(d.getDate()).padStart(2, '0');
+        const hour = d.getHours();
+        const minute = String(d.getMinutes()).padStart(2, '0');
+        const ampm = hour >= 12 ? '오후' : '오전';
+        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+
+        // User example uses 2-digit year "25". Let's stick to full year or 2-digit as per preference. 
+        // User text example: "2025.12.10."
+        return `${year}.${month}.${day}. ${ampm} ${displayHour}:${minute}`;
+    };
+
+    // 2. 결제방식 매핑
+    const getPaymentText = (type: string, isPickup: boolean) => {
+        // 배달: 앱결제, 만나서카드, 만나서현금
+        // 포장: 앱결제, 방문시결제
+        if (type === '만나서카드') return '만나서 카드';
+        if (type === '만나서현금') return '만나서 현금';
+        if (type === '방문시결제') return '방문 시 결제';
+        return '앱 결제'; // Default for '앱결제'
+    };
+
+    // 계산 로직
+    const itemsPrice = order.items.reduce((total, item) => {
+        const optionsPrice = item.options?.reduce((optSum, opt) => optSum + (opt.price * (opt.quantity || 1)), 0) || 0;
+        return total + ((item.price + optionsPrice) * item.quantity);
+    }, 0);
+
+    const discountAmount = order.discountAmount || 0;
+    const deliveryFee = order.totalPrice - itemsPrice + discountAmount;
+
+    return (
+        <div id="receipt-container">
+            <div className="w-[280px] mx-auto bg-white text-black font-mono text-[12px] leading-snug p-2 pb-8">
+
+                {/* 상점 정보 */}
+                <div className="text-center mb-4">
+                    <h1 className="text-xl font-bold mb-1">{store?.name || '상점'}</h1>
+                    <p className="mb-0.5">{store?.address || ''}</p>
+                    <p>Tel: {store?.phone || ''}</p>
+                </div>
+
+                {/* 주문 타입 배지 */}
+                <div className="text-center mb-2">
+                    <span className="inline-block border border-black px-2 py-0.5 font-bold text-sm">
+                        [{order.orderType}]
+                    </span>
+                </div>
+
+                {/* 주문 번호 */}
+                <div className="text-center mb-2">
+                    <p className="font-bold text-sm">주문번호: {order.id.slice(0, 4).toUpperCase()}</p>
+                </div>
+
+                {/* 주문 기본 정보 */}
+                <div className="mb-2 space-y-0.5">
+                    <div className="flex justify-between">
+                        <span>일시</span>
+                        <span>{formatDate(order.createdAt)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span>결제</span>
+                        <span>{getPaymentText(order.paymentType, order.orderType === '포장주문')}</span>
+                    </div>
+                </div>
+
+                {/* 고객 정보 */}
+                <div className="mb-2 mt-4">
+                    <p className="font-bold mb-1">고객 정보</p>
+                    {order.orderType === '배달주문' && (
+                        <p className="mb-1 break-words">{order.address}</p>
+                    )}
+                    <p className="mb-1">{order.phone}</p>
+                    {/* 포장주문시 이름, 전화번호만 노출인데 이름이 없으므로 전화번호만 노출됨 (배달시엔 주소 포함) */}
+                </div>
+
+                {/* 요청 사항 */}
+                {order.memo && (
+                    <div className="mb-2">
+                        <p className="font-bold mb-1">요청사항:</p>
+                        <p className="break-words">{order.memo}</p>
+                    </div>
+                )}
+
+                <div className="border-b border-black my-2"></div>
+
+                {/* 메뉴 헤더 */}
+                <div className="flex mb-1 font-bold">
+                    <span className="flex-1">메뉴명</span>
+                    <span className="w-8 text-center">수량</span>
+                    <span className="w-16 text-right">금액</span>
+                </div>
+
+                <div className="border-b border-black mb-2"></div>
+
+                {/* 메뉴 리스트 */}
+                <div className="mb-2">
+                    {order.items.map((item, index) => {
+                        const optionsPrice = item.options?.reduce((sum, opt) => sum + (opt.price * (opt.quantity || 1)), 0) || 0;
+                        const itemTotal = (item.price + optionsPrice) * item.quantity;
+                        // Format: 
+                        // Item Name    Qty    Price
+                        // - Option            Price
+                        //                     Total (aligned right)
+
+                        return (
+                            <div key={index} className="mb-2">
+                                {/* 메인 메뉴 */}
+                                <div className="flex items-start mb-0.5">
+                                    <span className="flex-1 break-words pr-1">{item.name}</span>
+                                    <span className="w-8 text-center">{item.quantity}</span>
+                                    <span className="w-16 text-right">{item.price.toLocaleString()}</span>
+                                </div>
+
+                                {/* 옵션 리스트 */}
+                                {item.options && item.options.map((opt, optIdx) => (
+                                    <div key={optIdx} className="flex text-gray-800 mb-0.5">
+                                        <span className="flex-1 break-words pl-2 text-[11px]">- {opt.name}</span>
+                                        <span className="w-8 text-center text-[11px]"></span> {/* 옵션 수량 표시는 보통 생략하거나 이름 옆에 */}
+                                        <span className="w-16 text-right text-[11px]">+{(opt.price * (opt.quantity || 1)).toLocaleString()}</span>
+                                    </div>
+                                ))}
+
+                                {/* 항목 소계 (옵션 포함 총액) */}
+                                <div className="text-right font-bold mt-1">
+                                    {itemTotal.toLocaleString()}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="border-b border-black my-2"></div>
+
+                {/* 금액 집계 */}
+                <div className="space-y-1 mb-2">
+                    <div className="flex justify-between">
+                        <span>주문금액</span>
+                        <span>{itemsPrice.toLocaleString()}</span>
+                    </div>
+                    {deliveryFee > 0 && (
+                        <div className="flex justify-between">
+                            <span>배달팁</span>
+                            <span>+{deliveryFee.toLocaleString()}</span>
+                        </div>
+                    )}
+                    {discountAmount > 0 && (
+                        <div className="flex justify-between">
+                            <span>할인금액</span>
+                            <span>-{discountAmount.toLocaleString()}</span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="border-b border-black my-2"></div>
+
+                {/* 최종 합계 */}
+                <div className="flex justify-between text-lg font-bold mb-4">
+                    <span>합계</span>
+                    <span>{order.totalPrice.toLocaleString()}원</span>
+                </div>
+
+                <div className="border-b border-black my-4"></div>
+
+                {/* 푸터 */}
+                <div className="text-center">
+                    <p className="mb-1 font-bold">* 이용해 주셔서 감사합니다 *</p>
+                    <p className="text-[10px]">Powered by CusCom</p>
+                </div>
+
+            </div>
+        </div>
+    );
+}
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\cart\CartUpsell.tsx
+
+Size: 2.56 KB
+
+```
+import { Plus } from 'lucide-react';
+import { Menu } from '../../types/menu';
+import Button from '../common/Button';
+
+interface CartUpsellProps {
+    items: Menu[];
+    onAdd: (menu: Menu) => void;
+}
+
+export default function CartUpsell({ items, onAdd }: CartUpsellProps) {
+    if (items.length === 0) return null;
+
+    return (
+        <div className="mt-8">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">
+                함께 드시면 더 맛있어요! 😋
+            </h3>
+            <div className="flex space-x-4 overflow-x-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                {items.map((item) => (
+                    <div
+                        key={item.id}
+                        className="flex-shrink-0 w-36 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                    >
+                        <div className="h-24 bg-gray-100 relative">
+                            {item.imageUrl ? (
+                                <img
+                                    src={item.imageUrl}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl">
+                                    🍽️
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-3">
+                            <h4 className="text-sm font-medium text-gray-900 truncate mb-1">
+                                {item.name}
+                            </h4>
+                            <p className="text-sm text-gray-600 mb-3">
+                                {item.price.toLocaleString()}원
+                            </p>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                fullWidth
+                                onClick={() => onAdd(item)}
+                                className="h-8 text-xs"
+                            >
+                                <Plus className="w-3 h-3 mr-1" />
+                                담기
+                            </Button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\event\EventBanner.tsx
+
+Size: 3.77 KB
+
+```
+import { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Event } from '../../types/event';
+import { useStore } from '../../contexts/StoreContext';
+import { useFirestoreCollection } from '../../hooks/useFirestoreCollection';
+import { getActiveEventsQuery } from '../../services/eventService';
+
+export default function EventBanner() {
+  const { store } = useStore();
+  const storeId = store?.id;
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Firestore에서 활성화된 이벤트만 조회
+  const { data: events, loading } = useFirestoreCollection<Event>(
+    storeId ? getActiveEventsQuery(storeId) : null
+  );
+
+  // 자동 슬라이드
+  useEffect(() => {
+    if (!events || events.length <= 1) return;
+
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % events.length);
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [events?.length]);
+
+  if (!storeId || loading) {
+    return null;
+  }
+
+  if (!events || events.length === 0) {
+    return null;
+  }
+
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev - 1 + events.length) % events.length);
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % events.length);
+  };
+
+  const handleClick = (event: Event) => {
+    if (event.link) {
+      window.open(event.link, '_blank');
+    }
+  };
+
+  const currentEvent = events[currentIndex];
+
+  return (
+    <div className="relative w-full">
+      {/* 배너 이미지 */}
+      <div
+        onClick={() => handleClick(currentEvent)}
+        className="relative aspect-[16/9] sm:aspect-[21/9] rounded-2xl overflow-hidden cursor-pointer group"
+      >
+        <img
+          src={currentEvent.imageUrl}
+          alt={currentEvent.title}
+          className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+        />
+
+        {/* 오버레이 */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent">
+          <div className="absolute bottom-0 left-0 right-0 p-6">
+            <h3 className="text-white font-bold text-xl sm:text-2xl drop-shadow-lg">
+              {currentEvent.title}
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      {/* 이전/다음 버튼 (여러 이벤트가 있을 때만) */}
+      {events.length > 1 && (
+        <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              goToPrevious();
+            }}
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all opacity-0 group-hover:opacity-100"
+          >
+            <ChevronLeft className="w-6 h-6 text-gray-800" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              goToNext();
+            }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all opacity-0 group-hover:opacity-100"
+          >
+            <ChevronRight className="w-6 h-6 text-gray-800" />
+          </button>
+
+          {/* 인디케이터 */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+            {events.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentIndex(idx);
+                }}
+                className={`w-2 h-2 rounded-full transition-all ${idx === currentIndex
+                  ? 'bg-white w-8'
+                  : 'bg-white/50 hover:bg-white/75'
+                  }`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\event\EventList.tsx
+
+Size: 3.17 KB
+
+```
+import { useState } from 'react';
+import { Calendar, ChevronRight } from 'lucide-react';
+import { Event } from '../../types/event';
+import { formatDate } from '../../utils/formatDate';
+import Card from '../common/Card';
+import Badge from '../common/Badge';
+import { useStore } from '../../contexts/StoreContext';
+import { useFirestoreCollection } from '../../hooks/useFirestoreCollection';
+import { getActiveEventsQuery } from '../../services/eventService';
+
+export default function EventList() {
+    const { store } = useStore();
+    const storeId = store?.id;
+    const { data: events, loading } = useFirestoreCollection<Event>(
+        storeId ? getActiveEventsQuery(storeId) : null
+    );
+
+    if (!storeId) return null;
+
+    if (loading) {
+        return (
+            <div className="text-center py-8">
+                <p className="text-gray-600">이벤트를 불러오는 중...</p>
+            </div>
+        );
+    }
+
+    if (!events || events.length === 0) {
+        return (
+            <div className="text-center py-16">
+                <div className="text-5xl mb-4">🎉</div>
+                <p className="text-gray-600">현재 진행 중인 이벤트가 없습니다</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {events.map((event) => (
+                <Card key={event.id} className="overflow-hidden p-0">
+                    {event.imageUrl && (
+                        <div className="relative h-48 w-full">
+                            <img
+                                src={event.imageUrl}
+                                alt={event.title}
+                                className="w-full h-full object-cover"
+                            />
+                            {event.active && (
+                                <div className="absolute top-2 right-2">
+                                    <Badge variant="success" size="sm">진행중</Badge>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <div className="p-4">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">{event.title}</h3>
+
+                        <div className="flex items-center text-sm text-gray-500 mb-4">
+                            <Calendar className="w-4 h-4 mr-1.5" />
+                            <span>
+                                {formatDate(event.startDate)} ~ {formatDate(event.endDate)}
+                            </span>
+                        </div>
+
+                        {event.link && (
+                            <a
+                                href={event.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium text-sm"
+                            >
+                                자세히 보기 <ChevronRight className="w-4 h-4 ml-0.5" />
+                            </a>
+                        )}
+                    </div>
+                </Card>
+            ))}
+        </div>
+    );
+}
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\figma\ImageWithFallback.tsx
+
+Size: 1.13 KB
+
+```
+import React, { useState } from 'react'
+
+const ERROR_IMG_SRC =
+  'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg=='
+
+export function ImageWithFallback(props: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const [didError, setDidError] = useState(false)
+
+  const handleError = () => {
+    setDidError(true)
+  }
+
+  const { src, alt, style, className, ...rest } = props
+
+  return didError ? (
+    <div
+      className={`inline-block bg-gray-100 text-center align-middle ${className ?? ''}`}
+      style={style}
+    >
+      <div className="flex items-center justify-center w-full h-full">
+        <img src={ERROR_IMG_SRC} alt="Error loading image" {...rest} data-original-url={src} />
+      </div>
+    </div>
+  ) : (
+    <img src={src} alt={alt} className={className} style={style} {...rest} onError={handleError} />
+  )
+}
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\menu\CategoryBar.tsx
+
+Size: 1.53 KB
+
+```
+import { CATEGORIES, Category } from '../../types/menu';
+
+interface CategoryBarProps {
+  selected: string;
+  onSelect: (category: string) => void;
+}
+
+export default function CategoryBar({ selected, onSelect }: CategoryBarProps) {
+  const allCategories = ['전체', ...CATEGORIES];
+  
+  return (
+    <div className="sticky top-16 z-40 bg-white border-b border-gray-200 shadow-sm">
+      <div className="container mx-auto px-4 py-3">
+        {/* 스크롤 힌트를 위한 그라데이션 오버레이 */}
+        <div className="relative">
+          {/* 오른쪽 그라데이션 (더 많은 항목이 있음을 표시) */}
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10 md:hidden"></div>
+          
+          {/* 카테고리 버튼들 */}
+          <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+            {allCategories.map((category) => (
+              <button
+                key={category}
+                onClick={() => onSelect(category)}
+                className={`
+                  px-4 py-2 rounded-lg whitespace-nowrap transition-all duration-200 flex-shrink-0
+                  ${
+                    selected === category
+                      ? 'gradient-primary text-white shadow-md scale-105'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }
+                `}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\menu\MenuCard.tsx
+
+Size: 3.64 KB
+
+```
+import { useState } from 'react';
+import { Plus, ShoppingCart } from 'lucide-react';
+import { Menu } from '../../types/menu';
+import { useCart } from '../../contexts/CartContext';
+import { toast } from 'sonner';
+import Card from '../common/Card';
+import Badge from '../common/Badge';
+import Button from '../common/Button';
+import MenuDetailModal from './MenuDetailModal';
+
+interface MenuCardProps {
+  menu: Menu;
+}
+
+export default function MenuCard({ menu }: MenuCardProps) {
+  const { addItem } = useCart();
+  const [showDetail, setShowDetail] = useState(false);
+
+  const handleQuickAdd = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (menu.soldout) {
+      toast.error('품절된 메뉴입니다');
+      return;
+    }
+
+    if (menu.options && menu.options.length > 0) {
+      // 옵션이 있으면 상세 모달 열기
+      setShowDetail(true);
+    } else {
+      // 옵션이 없으면 바로 추가
+      addItem({
+        menuId: menu.id,
+        name: menu.name,
+        price: menu.price,
+        quantity: 1,
+        imageUrl: menu.imageUrl,
+      });
+      toast.success('장바구니에 추가되었습니다');
+    }
+  };
+
+  return (
+    <>
+      <Card
+        hover
+        padding="none"
+        onClick={() => setShowDetail(true)}
+        className={`overflow-hidden ${menu.soldout ? 'opacity-60' : ''}`}
+      >
+        {/* Image */}
+        <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 group">
+          {menu.imageUrl ? (
+            <img
+              src={menu.imageUrl}
+              alt={menu.name}
+              className="w-full h-full object-cover transform transition-all duration-500 group-hover:scale-110 group-hover:brightness-105"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400">
+              <span className="text-5xl">🍜</span>
+            </div>
+          )}
+
+          {/* Badges */}
+          <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+            {menu.category.slice(0, 2).map((cat) => (
+              <Badge key={cat} variant="primary" size="sm">
+                {cat}
+              </Badge>
+            ))}
+          </div>
+
+          {menu.soldout && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <Badge variant="danger" size="lg">
+                품절
+              </Badge>
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="p-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-1 line-clamp-1">
+            {menu.name}
+          </h3>
+
+          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+            {menu.description}
+          </p>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-2xl font-bold text-blue-600">
+                {menu.price.toLocaleString()}
+              </span>
+              <span className="text-sm text-gray-600 ml-1">원</span>
+            </div>
+
+            <Button
+              size="sm"
+              onClick={handleQuickAdd}
+              disabled={menu.soldout}
+              className="group"
+            >
+              <ShoppingCart className="w-4 h-4 mr-1.5" />
+              담기
+            </Button>
+          </div>
+
+          {menu.options && menu.options.length > 0 && (
+            <p className="mt-2 text-xs text-gray-500">
+              {menu.options.length}개의 옵션 선택 가능
+            </p>
+          )}
+        </div>
+      </Card>
+
+      {showDetail && (
+        <MenuDetailModal
+          menu={menu}
+          onClose={() => setShowDetail(false)}
+        />
+      )}
+    </>
+  );
+}
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\menu\MenuDetailModal.tsx
+
+Size: 9.33 KB
+
+```
+import { useState } from 'react';
+import { X, Plus, Minus, ShoppingCart } from 'lucide-react';
+import { Menu, MenuOption } from '../../types/menu';
+import { useCart } from '../../contexts/CartContext';
+import { toast } from 'sonner';
+import Button from '../common/Button';
+import Badge from '../common/Badge';
+
+interface MenuDetailModalProps {
+  menu: Menu;
+  onClose: () => void;
+}
+
+export default function MenuDetailModal({ menu, onClose }: MenuDetailModalProps) {
+  // ATOM-122: 숨김 메뉴 접근 차단
+  if (menu.isHidden) {
+    onClose();
+    return null;
+  }
+
+  const { addItem } = useCart();
+  const [quantity, setQuantity] = useState(1);
+  const [selectedOptions, setSelectedOptions] = useState<MenuOption[]>([]);
+
+  const toggleOption = (option: MenuOption) => {
+    setSelectedOptions(prev => {
+      const exists = prev.find(opt => opt.id === option.id);
+      if (exists) {
+        return prev.filter(opt => opt.id !== option.id);
+      } else {
+        return [...prev, { ...option, quantity: 1 }];
+      }
+    });
+  };
+
+  const updateOptionQuantity = (optionId: string, delta: number) => {
+    setSelectedOptions(prev => {
+      return prev.map(opt => {
+        if (opt.id === optionId) {
+          const newQuantity = (opt.quantity || 1) + delta;
+          if (newQuantity < 1) return opt; // Minimum 1
+          return { ...opt, quantity: newQuantity };
+        }
+        return opt;
+      });
+    });
+  };
+
+  const getTotalPrice = () => {
+    const optionsPrice = selectedOptions.reduce((sum, opt) => sum + (opt.price * (opt.quantity || 1)), 0);
+    return (menu.price + optionsPrice) * quantity;
+  };
+
+  const handleAddToCart = () => {
+    if (menu.soldout) {
+      toast.error('품절된 메뉴입니다');
+      return;
+    }
+
+    addItem({
+      menuId: menu.id,
+      name: menu.name,
+      price: menu.price,
+      quantity,
+      options: selectedOptions,
+      imageUrl: menu.imageUrl,
+    });
+
+    toast.success(`${menu.name}을(를) 장바구니에 담았습니다`);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 animate-fade-in">
+      <div
+        className="relative w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-hidden animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-colors"
+        >
+          <X className="w-5 h-5 text-gray-600" />
+        </button>
+
+        <div className="overflow-y-auto max-h-[90vh]">
+          {/* Image */}
+          <div className="relative aspect-[16/9] bg-gray-100">
+            {menu.imageUrl ? (
+              <img
+                src={menu.imageUrl}
+                alt={menu.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                <span className="text-8xl">🍜</span>
+              </div>
+            )}
+
+            {menu.soldout && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <Badge variant="danger" size="lg">
+                  품절
+                </Badge>
+              </div>
+            )}
+          </div>
+
+          {/* Content */}
+          <div className="p-6">
+            {/* Header */}
+            <div className="mb-4">
+              <div className="flex flex-wrap gap-2 mb-2">
+                {menu.category.map((cat) => (
+                  <Badge key={cat} variant="primary">
+                    {cat}
+                  </Badge>
+                ))}
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">{menu.name}</h2>
+              <p className="text-gray-600">{menu.description}</p>
+            </div>
+
+            {/* Price */}
+            <div className="mb-6 pb-6 border-b border-gray-200">
+              <span className="text-3xl font-bold text-blue-600">
+                {menu.price.toLocaleString()}
+              </span>
+              <span className="text-lg text-gray-600 ml-2">원</span>
+            </div>
+
+            {/* Options */}
+            {menu.options && menu.options.length > 0 && (
+              <div className="mb-6 pb-6 border-b border-gray-200">
+                <h3 className="font-semibold text-gray-900 mb-3">옵션 선택</h3>
+                <div className="space-y-2">
+                  {menu.options.map((option) => {
+                    const selected = selectedOptions.find(opt => opt.id === option.id);
+                    return (
+                      <div
+                        key={option.id}
+                        className={`
+                          w-full rounded-lg border-2 transition-all overflow-hidden
+                          ${selected
+                            ? 'border-blue-500 bg-white'
+                            : 'border-gray-200 hover:border-gray-300'
+                          }
+                        `}
+                      >
+                        <button
+                          onClick={() => toggleOption(option)}
+                          className="w-full flex items-center justify-between p-4 text-left"
+                        >
+                          <span className="font-medium text-gray-900">{option.name}</span>
+                          <span className={`${selected ? 'text-blue-600' : 'text-gray-900'} font-semibold`}>
+                            +{option.price.toLocaleString()}원
+                          </span>
+                        </button>
+
+                        {selected && option.quantity !== undefined && (
+                          <div className="flex items-center justify-between bg-blue-50 p-3 border-t border-blue-100 animate-slide-down">
+                            <span className="text-sm text-blue-800 font-medium ml-1">수량</span>
+                            <div className="flex items-center bg-white rounded-lg border border-blue-200 shadow-sm">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateOptionQuantity(option.id, -1);
+                                }}
+                                className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-gray-50 rounded-l-lg transition-colors"
+                              >
+                                <Minus className="w-4 h-4" />
+                              </button>
+                              <span className="w-8 text-center text-sm font-bold text-gray-900">
+                                {selected.quantity || 1}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateOptionQuantity(option.id, 1);
+                                }}
+                                className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-gray-50 rounded-r-lg transition-colors"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Quantity */}
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3">수량</h3>
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:text-blue-600 transition-colors"
+                >
+                  <Minus className="w-5 h-5" />
+                </button>
+                <span className="text-2xl font-bold text-gray-900 min-w-[3rem] text-center">
+                  {quantity}
+                </span>
+                <button
+                  onClick={() => setQuantity(quantity + 1)}
+                  className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:text-blue-600 transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Total & Add to Cart */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 mb-1">총 금액</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {getTotalPrice().toLocaleString()}원
+                </p>
+              </div>
+              <Button
+                size="lg"
+                onClick={handleAddToCart}
+                disabled={menu.soldout}
+                className="flex-1"
+              >
+                <ShoppingCart className="w-5 h-5 mr-2" />
+                장바구니 담기
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\notice\NoticeList.tsx
+
+Size: 3.98 KB
+
+```
+import { useState } from 'react';
+import { Clock, Pin, ChevronDown, ChevronUp } from 'lucide-react';
+import { Notice } from '../../types/notice';
+import { formatDateRelative } from '../../utils/formatDate';
+import Card from '../common/Card';
+import Badge from '../common/Badge';
+import { useStore } from '../../contexts/StoreContext';
+import { useFirestoreCollection } from '../../hooks/useFirestoreCollection';
+import { getAllNoticesQuery } from '../../services/noticeService';
+
+export default function NoticeList() {
+  const { store } = useStore();
+  const storeId = store?.id;
+  const { data: notices, loading } = useFirestoreCollection<Notice>(
+    storeId ? getAllNoticesQuery(storeId) : null
+  );
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  if (!storeId) {
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-600">공지사항을 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  // 고정 공지와 일반 공지 분류
+  const pinnedNotices = (notices || []).filter(n => n.pinned);
+  const regularNotices = (notices || []).filter(n => !n.pinned);
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case '공지': return 'primary';
+      case '이벤트': return 'secondary';
+      case '점검': return 'danger';
+      case '할인': return 'success';
+      default: return 'gray';
+    }
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
+
+  const renderNotice = (notice: Notice) => {
+    const isExpanded = expandedId === notice.id;
+    const isPinned = notice.pinned;
+
+    return (
+      <Card
+        key={notice.id}
+        className={`${isPinned ? 'bg-blue-50 border-2 border-blue-200' : ''}`}
+      >
+        <div
+          className="cursor-pointer"
+          onClick={() => toggleExpand(notice.id)}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-2 flex-1">
+              {isPinned && (
+                <Pin className="w-4 h-4 text-blue-600 flex-shrink-0" />
+              )}
+              <Badge
+                variant={getCategoryColor(notice.category)}
+                size="sm"
+              >
+                {notice.category}
+              </Badge>
+              <h3 className="font-semibold text-gray-900 line-clamp-1 flex-1">
+                {notice.title}
+              </h3>
+            </div>
+            {isExpanded ? (
+              <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            )}
+          </div>
+
+          {/* Preview */}
+          {!isExpanded && (
+            <p className="text-sm text-gray-600 line-clamp-2 mb-2">
+              {notice.content}
+            </p>
+          )}
+
+          {/* Date */}
+          <div className="flex items-center text-xs text-gray-500">
+            <Clock className="w-3 h-3 mr-1" />
+            {formatDateRelative(notice.createdAt)}
+          </div>
+        </div>
+
+        {/* Expanded Content */}
+        {isExpanded && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <p className="text-gray-700 whitespace-pre-wrap">
+              {notice.content}
+            </p>
+          </div>
+        )}
+      </Card>
+    );
+  };
+
+  if (notices.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <div className="text-5xl mb-4">📢</div>
+        <p className="text-gray-600">등록된 공지사항이 없습니다</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* 고정 공지 */}
+      {pinnedNotices.length > 0 && (
+        <div className="space-y-3">
+          {pinnedNotices.map(renderNotice)}
+        </div>
+      )}
+
+      {/* 일반 공지 */}
+      {regularNotices.length > 0 && (
+        <div className="space-y-3">
+          {regularNotices.map(renderNotice)}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\notice\NoticePopup.tsx
+
+Size: 4.02 KB
+
+```
+import { useState, useEffect } from 'react';
+import { X, Pin } from 'lucide-react';
+import { Notice } from '../../types/notice';
+import { useStore } from '../../contexts/StoreContext';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { getNoticesPath } from '../../lib/firestorePaths';
+import Card from '../common/Card';
+import Button from '../common/Button';
+import Badge from '../common/Badge';
+
+export default function NoticePopup() {
+  const { store } = useStore();
+  const storeId = store?.id;
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (!storeId) return;
+
+    const loadPinnedNotice = async () => {
+      try {
+        // 고정된 공지 중 가장 최근 것 하나만 가져오기
+        const q = query(
+          collection(db, getNoticesPath(storeId)),
+          where('pinned', '==', true),
+          orderBy('createdAt', 'desc'),
+          limit(1)
+        );
+
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          return;
+        }
+
+        const noticeDoc = snapshot.docs[0];
+        const noticeData = {
+          id: noticeDoc.id,
+          ...noticeDoc.data(),
+        } as Notice;
+
+        // localStorage 체크: 오늘 본 공지인지 확인
+        const today = new Date().toISOString().split('T')[0];
+        const storageKey = `notice_popup_${noticeData.id}_${today}`;
+        const hasSeenToday = localStorage.getItem(storageKey);
+
+        if (!hasSeenToday) {
+          setNotice(noticeData);
+          setShow(true);
+        }
+      } catch (error) {
+        console.error('공지사항 팝업 로드 실패:', error);
+      }
+    };
+
+    loadPinnedNotice();
+  }, [storeId]);
+
+  const handleClose = (dontShowToday: boolean = false) => {
+    if (dontShowToday && notice) {
+      const today = new Date().toISOString().split('T')[0];
+      const storageKey = `notice_popup_${notice.id}_${today}`;
+      localStorage.setItem(storageKey, 'true');
+    }
+    setShow(false);
+  };
+
+  if (!show || !notice) {
+    return null;
+  }
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case '공지': return 'primary';
+      case '이벤트': return 'secondary';
+      case '점검': return 'danger';
+      case '할인': return 'success';
+      default: return 'gray';
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
+      <div className="relative w-full max-w-lg">
+        <Card className="relative">
+          {/* Close Button */}
+          <button
+            onClick={() => handleClose(false)}
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-600" />
+          </button>
+
+          {/* Header */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Pin className="w-5 h-5 text-blue-600" />
+              <Badge variant={getCategoryColor(notice.category)}>
+                {notice.category}
+              </Badge>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 pr-8">
+              {notice.title}
+            </h2>
+          </div>
+
+          {/* Content */}
+          <div className="mb-6">
+            <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+              {notice.content}
+            </p>
+          </div>
+
+          {/* Footer */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              variant="outline"
+              fullWidth
+              onClick={() => handleClose(true)}
+            >
+              오늘 하루 보지 않기
+            </Button>
+            <Button
+              fullWidth
+              onClick={() => handleClose(false)}
+            >
+              확인
+            </Button>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\review\ReviewList.test.tsx
+
+Size: 3.37 KB
+
+```
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import ReviewList from './ReviewList';
+import { useStore } from '../../contexts/StoreContext';
+import { useFirestoreCollection } from '../../hooks/useFirestoreCollection';
+
+// Mocks
+vi.mock('../../contexts/StoreContext', () => ({
+    useStore: vi.fn(),
+}));
+
+vi.mock('../../hooks/useFirestoreCollection', () => ({
+    useFirestoreCollection: vi.fn(),
+}));
+
+vi.mock('../../services/reviewService', () => ({
+    getAllReviewsQuery: vi.fn(),
+}));
+
+vi.mock('../../utils/formatDate', () => ({
+    formatDate: (date: any) => '2024-01-01',
+}));
+
+// Mock Lucide
+vi.mock('lucide-react', () => ({
+    Star: ({ className }: any) => <span className={className}>Star</span>,
+    User: () => <span>User</span>,
+}));
+
+describe('ReviewList', () => {
+    const mockStore = { id: 'store_1' };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        (useStore as any).mockReturnValue({ store: mockStore });
+        // Default safe return
+        (useFirestoreCollection as any).mockReturnValue({ data: [], loading: false });
+    });
+
+    it('should render nothing if no store', () => {
+        (useStore as any).mockReturnValue({ store: null });
+        // Even with null store, hook might be called or component returns early. 
+        // If hook is called, it needs return value.
+        const { container } = render(<ReviewList />);
+        expect(container).toBeEmptyDOMElement();
+    });
+
+    it('should render loading state', () => {
+        (useFirestoreCollection as any).mockReturnValue({
+            data: [],
+            loading: true,
+        });
+        render(<ReviewList />);
+        expect(screen.getByText('리뷰를 불러오는 중...')).toBeInTheDocument();
+    });
+
+    it('should render empty state', () => {
+        (useFirestoreCollection as any).mockReturnValue({
+            data: [],
+            loading: false,
+        });
+        render(<ReviewList />);
+        expect(screen.getByText('아직 작성된 리뷰가 없습니다')).toBeInTheDocument();
+    });
+
+    it('should render reviews and statistics', () => {
+        const mockReviews = [
+            {
+                id: 'review_1',
+                rating: 5,
+                comment: 'Great!',
+                userDisplayName: 'User A',
+                createdAt: '2024-01-01',
+                images: []
+            },
+            {
+                id: 'review_2',
+                rating: 3,
+                comment: 'Okay',
+                userDisplayName: 'User B',
+                createdAt: '2024-01-02',
+                images: ['img.jpg']
+            }
+        ];
+
+        (useFirestoreCollection as any).mockReturnValue({
+            data: mockReviews,
+            loading: false,
+        });
+
+        render(<ReviewList />);
+
+        // Statistics: Avg (5+3)/2 = 4.0
+        expect(screen.getByText('4.0')).toBeInTheDocument();
+        expect(screen.getByText('총 2개의 리뷰')).toBeInTheDocument();
+
+        // Review content
+        expect(screen.getByText('Great!')).toBeInTheDocument();
+        expect(screen.getByText('Okay')).toBeInTheDocument();
+
+        // Check "1개" (rating count) appears
+        const countElements = screen.getAllByText('1개');
+        expect(countElements.length).toBeGreaterThanOrEqual(1);
+    });
+});
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\review\ReviewList.tsx
+
+Size: 5.93 KB
+
+```
+import { Star, User } from 'lucide-react';
+import { useStore } from '../../contexts/StoreContext';
+import { useFirestoreCollection } from '../../hooks/useFirestoreCollection';
+import { getAllReviewsQuery } from '../../services/reviewService';
+import { Review } from '../../types/review';
+import Card from '../common/Card';
+import { formatDate } from '../../utils/formatDate';
+
+export default function ReviewList() {
+  const { store } = useStore();
+  const storeId = store?.id;
+
+  // Firestore에서 리뷰 조회 (최신순)
+  const { data: reviews, loading } = useFirestoreCollection<Review>(
+    storeId ? getAllReviewsQuery(storeId) : null
+  );
+
+  if (!storeId) {
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <div className="py-8 text-center">
+        <p className="text-gray-600">리뷰를 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (!reviews || reviews.length === 0) {
+    return (
+      <div className="py-16 text-center">
+        <div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+          <Star className="w-10 h-10 text-gray-400" />
+        </div>
+        <p className="text-gray-600">아직 작성된 리뷰가 없습니다</p>
+        <p className="text-sm text-gray-500 mt-2">첫 번째 리뷰를 작성해보세요!</p>
+      </div>
+    );
+  }
+
+  // 평균 별점 계산
+  const averageRating = reviews.length > 0
+    ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
+    : '0.0';
+
+  // 별점별 개수
+  const ratingCounts = [5, 4, 3, 2, 1].map(rating => ({
+    rating,
+    count: reviews.filter(r => r.rating === rating).length,
+  }));
+
+  return (
+    <div className="space-y-6">
+      {/* 리뷰 통계 */}
+      <Card>
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* 평균 별점 */}
+          <div className="text-center md:border-r border-gray-200">
+            <p className="text-sm text-gray-600 mb-2">평균 별점</p>
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Star className="w-8 h-8 fill-yellow-400 text-yellow-400" />
+              <span className="text-4xl font-bold text-gray-900">{averageRating}</span>
+              <span className="text-xl text-gray-500">/ 5.0</span>
+            </div>
+            <p className="text-sm text-gray-600">총 {reviews.length}개의 리뷰</p>
+          </div>
+
+          {/* 별점 분포 */}
+          <div className="space-y-2">
+            {ratingCounts.map(({ rating, count }) => (
+              <div key={rating} className="flex items-center gap-3">
+                <div className="flex items-center gap-1 w-16">
+                  <span className="text-sm font-medium text-gray-700">{rating}</span>
+                  <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                </div>
+                <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-yellow-400 h-full rounded-full transition-all"
+                    style={{
+                      width: `${reviews.length > 0 ? (count / reviews.length) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+                <span className="text-sm text-gray-600 w-12 text-right">{count}개</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      {/* 리뷰 목록 */}
+      <div className="space-y-4">
+        {reviews.map((review) => (
+          <ReviewCard key={review.id} review={review} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReviewCard({ review }: { review: Review }) {
+  const ratingColor =
+    review.rating === 5 ? 'text-yellow-500' :
+      review.rating === 4 ? 'text-blue-500' :
+        'text-gray-500';
+
+  return (
+    <Card>
+      <div className="flex items-start gap-4">
+        {/* Avatar */}
+        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+          <User className="w-6 h-6 text-white" />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-4 mb-2">
+            <div>
+              <p className="font-semibold text-gray-900">{review.userDisplayName}</p>
+              <div className="flex items-center gap-1 mt-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`w-4 h-4 ${star <= review.rating
+                      ? 'fill-yellow-400 text-yellow-400'
+                      : 'text-gray-300'
+                      }`}
+                  />
+                ))}
+                <span className="ml-2 font-semibold text-gray-900">
+                  {review.rating}.0
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 whitespace-nowrap">
+              {formatDate(review.createdAt)}
+            </p>
+          </div>
+
+          {/* Content */}
+          <p className="text-gray-700 leading-relaxed break-words">
+            {review.comment}
+          </p>
+
+          {/* Review Image */}
+          {review.images && review.images.length > 0 && (
+            <div className="mt-3">
+              <div className="relative w-32 h-32 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                <img
+                  src={review.images[0]}
+                  alt="Review Type"
+                  className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => window.open(review.images![0], '_blank')}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Updated indicator */}
+          {review.updatedAt && review.updatedAt !== review.createdAt && (
+            <p className="text-xs text-gray-500 mt-2">
+              (수정됨: {formatDate(review.updatedAt)})
+            </p>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\review\ReviewModal.tsx
+
+Size: 10.1 KB
+
+```
+import { useState, useEffect, useRef } from 'react';
+import { X, Star, Trash2, Camera } from 'lucide-react';
+import Button from '../common/Button';
+import Card from '../common/Card';
+import { toast } from 'sonner';
+import { useAuth } from '../../contexts/AuthContext';
+import { useStore } from '../../contexts/StoreContext';
+import { createReview, updateReview, deleteReview, getReviewByOrder } from '../../services/reviewService';
+import { uploadReviewImage, validateImageFile } from '../../services/storageService';
+import { Review } from '../../types/review';
+
+interface ReviewModalProps {
+  orderId: string;
+  onClose: () => void;
+  onSuccess?: () => void;
+}
+
+export default function ReviewModal({ orderId, onClose, onSuccess }: ReviewModalProps) {
+  const { user } = useAuth();
+  const { store } = useStore();
+  const storeId = store?.id;
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [existingReview, setExistingReview] = useState<Review | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 기존 리뷰 확인
+  useEffect(() => {
+    if (!storeId || !user) return;
+
+    const loadExistingReview = async () => {
+      try {
+        const review = await getReviewByOrder(storeId, orderId, user.id);
+        if (review) {
+          setExistingReview(review);
+          setRating(review.rating);
+          setComment(review.comment);
+          if (review.images && review.images.length > 0) {
+            setImagePreview(review.images[0]);
+          }
+        }
+      } catch (error) {
+        console.error('기존 리뷰 조회 실패:', error);
+      }
+    };
+
+    loadExistingReview();
+  }, [storeId, orderId, user]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        toast.error(validation.error);
+        return;
+      }
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!storeId || !user) {
+      toast.error('로그인이 필요합니다');
+      return;
+    }
+
+    if (rating === 0) {
+      toast.error('별점을 선택해주세요');
+      return;
+    }
+
+    if (!comment.trim()) {
+      toast.error('리뷰 내용을 입력해주세요');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // 이미지 업로드
+      let imageUrls = existingReview?.images || [];
+
+      // 새 이미지가 있으면 업로드
+      if (imageFile) {
+        const url = await uploadReviewImage(imageFile);
+        imageUrls = [url]; // 현재는 1장만 지원 (덮어쓰기)
+      }
+
+      // 이미지를 삭제했다면 (preview가 null이고 file도 null이면)
+      if (!imagePreview && !imageFile) {
+        imageUrls = [];
+      }
+
+      const reviewData = {
+        rating,
+        comment: comment.trim(),
+        images: imageUrls,
+      };
+
+      if (existingReview) {
+        // 수정
+        await updateReview(storeId, existingReview.id, reviewData);
+        toast.success('리뷰가 수정되었습니다');
+      } else {
+        // 생성
+        await createReview(storeId, {
+          orderId,
+          userId: user.id,
+          userDisplayName: user.displayName || user.email || '사용자',
+          ...reviewData,
+        });
+        toast.success('리뷰가 등록되었습니다');
+      }
+
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      console.error('Review submit error:', error);
+      toast.error('리뷰 처리 중 오류가 발생했습니다');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!storeId || !existingReview) return;
+
+    if (!window.confirm('리뷰를 삭제하시겠습니까?')) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      await deleteReview(storeId, existingReview.id, orderId);
+      toast.success('리뷰가 삭제되었습니다');
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      toast.error('리뷰 삭제 중 오류가 발생했습니다');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 animate-fade-in">
+      <div
+        className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+        >
+          <X className="w-5 h-5 text-gray-600" />
+        </button>
+
+        <div className="p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            리뷰 작성
+          </h2>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Rating */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                별점을 선택해주세요
+              </label>
+              <div className="flex gap-2 justify-center">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setRating(star)}
+                    onMouseEnter={() => setHoverRating(star)}
+                    onMouseLeave={() => setHoverRating(0)}
+                    className="transition-transform hover:scale-110"
+                  >
+                    <Star
+                      className={`w-12 h-12 ${star <= (hoverRating || rating)
+                        ? 'fill-yellow-400 text-yellow-400'
+                        : 'text-gray-300'
+                        }`}
+                    />
+                  </button>
+                ))}
+              </div>
+              {rating > 0 && (
+                <p className="text-center mt-2 text-gray-600">
+                  {rating}점
+                </p>
+              )}
+            </div>
+
+            {/* Comment */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                리뷰 내용
+              </label>
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="음식은 어떠셨나요? 솔직한 리뷰를 남겨주세요."
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                rows={5}
+                maxLength={500}
+              />
+              <p className="text-sm text-gray-500 mt-1 text-right">
+                {comment.length}/500
+              </p>
+            </div>
+
+            {/* Image Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                사진 첨부
+              </label>
+              <div className="flex gap-3 overflow-x-auto py-2">
+                {/* Upload Button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-20 h-20 flex flex-col items-center justify-center border border-dashed border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-500 hover:text-blue-500"
+                >
+                  <Camera className="w-6 h-6 mb-1" />
+                  <span className="text-xs">사진 추가</span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageChange}
+                />
+
+                {/* Preview */}
+                {imagePreview && (
+                  <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageFile(null);
+                        setImagePreview(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 hover:bg-red-500 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                fullWidth
+                onClick={onClose}
+              >
+                취소
+              </Button>
+              <Button
+                type="submit"
+                fullWidth
+                isLoading={isLoading}
+              >
+                리뷰 등록
+              </Button>
+            </div>
+
+            {/* Delete Button */}
+            {existingReview && (
+              <div className="mt-4">
+                <Button
+                  type="button"
+                  variant="danger"
+                  fullWidth
+                  onClick={handleDelete}
+                  isLoading={isDeleting}
+                >
+                  리뷰 삭제
+                </Button>
+              </div>
+            )}
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\components\review\ReviewPreview.tsx
+
+Size: 4.62 KB
+
+```
+import { Link } from 'react-router-dom';
+import { Star, ChevronRight, User } from 'lucide-react';
+import { useStore } from '../../contexts/StoreContext';
+import { useFirestoreCollection } from '../../hooks/useFirestoreCollection';
+import { getAllReviewsQuery } from '../../services/reviewService';
+import { Review } from '../../types/review';
+import { formatDate } from '../../utils/formatDate';
+import Card from '../common/Card';
+
+export default function ReviewPreview() {
+    const { store } = useStore();
+    const storeId = store?.id;
+
+    // Fetch reviews (sorted by newest First)
+    const { data: reviews, loading } = useFirestoreCollection<Review>(
+        storeId ? getAllReviewsQuery(storeId) : null
+    );
+
+    // Take only top 5 for preview
+    const recentReviews = reviews ? reviews.slice(0, 5) : [];
+
+    if (!storeId || loading) return null;
+
+    if (recentReviews.length === 0) {
+        return null; // hide if no reviews
+    }
+
+    return (
+        <div className="container mx-auto px-4 mt-8 mb-12">
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                    <span className="text-primary-600">💬</span>
+                    <span>생생 리뷰 미리보기</span>
+                </h2>
+                <Link
+                    to="/reviews"
+                    className="text-sm text-gray-500 hover:text-primary-600 flex items-center gap-1"
+                >
+                    더보기 <ChevronRight className="w-4 h-4" />
+                </Link>
+            </div>
+
+            <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-4 snap-x snap-mandatory">
+                {recentReviews.map((review) => (
+                    <div key={review.id} className="min-w-[280px] w-[280px] snap-start">
+                        <Card
+                            className="h-full flex flex-col p-4 bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group overflow-hidden"
+                            padding="none"
+                        >
+                            {/* Image if available */}
+                            {review.images && review.images.length > 0 && (
+                                <div className="relative w-full h-32 overflow-hidden bg-gray-100">
+                                    <img
+                                        src={review.images[0]}
+                                        alt="Review"
+                                        className="w-full h-full object-cover transform transition-all duration-500 group-hover:scale-110 group-hover:brightness-105"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="p-4 flex-1 flex flex-col">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                            <User className="w-4 h-4 text-blue-600" />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-semibold text-gray-900 truncate max-w-[100px]">
+                                                {review.userDisplayName}
+                                            </span>
+                                            <div className="flex items-center">
+                                                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                                <span className="text-xs font-bold ml-1">{review.rating}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs text-gray-400">{formatDate(review.createdAt)}</span>
+                                </div>
+
+                                <div className="flex-1">
+                                    <p className="text-sm text-gray-600 line-clamp-3 break-words">
+                                        {review.comment}
+                                    </p>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+```
+
+---
+

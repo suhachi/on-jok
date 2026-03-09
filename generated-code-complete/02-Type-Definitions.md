@@ -1,0 +1,459 @@
+﻿# 02-Type-Definitions
+
+Files: 10
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\types\coupon.ts
+
+Size: 0.65 KB
+
+```
+export interface Coupon {
+  id: string;
+  code: string;
+  name: string;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  minOrderAmount: number;
+  maxDiscountAmount?: number;
+  validFrom: Date;
+  validUntil: Date;
+  isActive: boolean;
+  createdAt: Date;
+  // 특정 회원에게만 발급된 쿠폰인 경우
+  assignedUserId?: string;
+  assignedUserName?: string;
+  assignedUserPhone?: string;
+  // 사용 여부 (1회만 사용 가능)
+  isUsed: boolean;
+  usedAt?: Date;
+  usedByUserIds?: string[]; // 이 쿠폰을 사용한 사용자 ID 목록
+}
+
+export const DISCOUNT_TYPE_LABELS = {
+  percentage: '퍼센트 할인',
+  fixed: '금액 할인',
+};
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\types\dashboard.ts
+
+Size: 0.74 KB
+
+```
+import { BadgeVariant } from '../components/common/Badge';
+
+export interface StatCardProps {
+    label: string;
+    value: number | string;
+    icon: React.ReactNode;
+    color: 'blue' | 'green' | 'orange' | 'purple';
+    suffix?: string;
+    loading?: boolean;
+}
+
+export interface QuickStatProps {
+    label: string;
+    value: number | string;
+    suffix: string;
+    color: 'blue' | 'green' | 'red' | 'orange' | 'purple';
+}
+
+export function getNoticeCategoryColor(category: string): BadgeVariant {
+    switch (category) {
+        case '공지': return 'primary';
+        case '이벤트': return 'secondary';
+        case '점검': return 'danger';
+        case '할인': return 'success';
+        default: return 'gray';
+    }
+}
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\types\event.ts
+
+Size: 0.16 KB
+
+```
+export interface Event {
+  id: string;
+  title: string;
+  imageUrl: string;
+  link: string;
+  active: boolean;
+  startDate: Date;
+  endDate: Date;
+  createdAt: Date;
+}
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\types\global.d.ts
+
+Size: 0.92 KB
+
+```
+export { };
+
+declare global {
+    interface Window {
+        AUTHNICE?: {
+            requestPay: (params: NicepayRequestParams) => void;
+        };
+    }
+}
+
+export interface NicepayRequestParams {
+    clientId: string;
+    method: string;
+    orderId: string;
+    amount: number;
+    goodsName: string;
+    returnUrl: string;
+    fnError?: (result: any) => void; // 결제 실패 시 콜백
+    // 필요한 경우 추가 필드 정의
+    buyerName?: string;
+    buyerEmail?: string;
+    buyerTel?: string;
+    mallReserved?: string; // 상점 예비정보
+}
+
+export interface NicepaySuccessResult {
+    resultCode: string;
+    resultMsg: string;
+    authResultCode: string;
+    authResultMsg: string;
+    tid: string;
+    clientId: string;
+    orderId: string;
+    amount: number;
+    mallReserved?: string;
+    authToken: string; // 승인 요청 시 필요
+    signature: string; // 위변조 검증
+}
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\types\menu.ts
+
+Size: 0.59 KB
+
+```
+export interface MenuOption {
+  id: string;
+  name: string;
+  price: number;
+  quantity?: number; // 옵션1용: 수량이 있는 옵션
+}
+
+export interface Menu {
+  id: string;
+  name: string;
+  price: number;
+  category: string[];
+  description: string;
+  imageUrl?: string;
+  options?: MenuOption[];
+  soldout: boolean;
+  isHidden?: boolean; // 숨김 상태 (고객 화면 완전 미노출)
+  createdAt: Date;
+}
+
+export const CATEGORIES = [
+  '인기메뉴',
+  '추천메뉴',
+  '기본메뉴',
+  '사이드메뉴',
+  '음료',
+  '주류',
+] as const;
+
+export type Category = typeof CATEGORIES[number];
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\types\notice.ts
+
+Size: 0.34 KB
+
+```
+export interface Notice {
+  id: string;
+  title: string;
+  content: string;
+  category: '공지' | '이벤트' | '점검' | '할인';
+  pinned: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const NOTICE_CATEGORIES = ['공지', '이벤트', '점검', '할인'] as const;
+export type NoticeCategory = typeof NOTICE_CATEGORIES[number];
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\types\order.ts
+
+Size: 2.43 KB
+
+```
+export interface OrderItem {
+  menuId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  options?: { name: string; price: number; quantity?: number }[];
+  imageUrl?: string;
+}
+
+export interface Order {
+  id: string;
+  userId: string;
+  items: OrderItem[];
+  totalPrice: number;
+  discountAmount?: number;
+  couponId?: string;
+  couponName?: string;
+  status: OrderStatus;
+  address: string;
+  phone: string;
+  memo?: string;
+  paymentType: PaymentType;
+  // 결제 관련 필드 추가
+  paymentStatus?: '결제대기' | '결제완료' | '결제실패';
+  payment?: {
+    pg: string;
+    tid?: string;
+    amount?: number;
+    paidAt?: any;
+    error?: string;
+    code?: string;
+  };
+  createdAt: Date;
+  updatedAt?: Date;
+  reviewed?: boolean;
+  reviewRating?: number;
+  orderType?: '배달주문' | '포장주문'; // 주문 타입 추가
+}
+
+export type OrderStatus = '결제대기' | '결제실패' | '접수' | '접수완료' | '조리중' | '조리완료' | '배달중' | '포장완료' | '완료' | '취소';
+export type PaymentType = '앱결제' | '만나서카드' | '만나서현금' | '방문시결제';
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  '결제대기': '결제 대기',
+  '결제실패': '결제 실패',
+  '접수': '주문 접수',
+  '접수완료': '접수 완료',
+  '조리중': '조리 중',
+  '조리완료': '조리 완료',
+  '배달중': '배달 중',
+  '포장완료': '포장 완료',
+  '완료': '배달 완료',
+  '취소': '주문 취소',
+};
+
+export const ORDER_STATUS_COLORS: Record<OrderStatus, { bg: string; text: string }> = {
+  '결제대기': { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+  '결제실패': { bg: 'bg-red-100', text: 'text-red-700' },
+  '접수': { bg: 'bg-blue-100', text: 'text-blue-700' },
+  '접수완료': { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+  '조리중': { bg: 'bg-orange-100', text: 'text-orange-700' },
+  '조리완료': { bg: 'bg-amber-100', text: 'text-amber-800' },
+  '배달중': { bg: 'bg-purple-100', text: 'text-purple-700' },
+  '포장완료': { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  '완료': { bg: 'bg-green-100', text: 'text-green-700' },
+  '취소': { bg: 'bg-gray-100', text: 'text-gray-700' },
+};
+
+export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
+  '앱결제': '앱 결제',
+  '만나서카드': '만나서 카드 결제',
+  '만나서현금': '만나서 현금 결제',
+  '방문시결제': '방문 시 결제',
+};
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\types\review.ts
+
+Size: 0.44 KB
+
+```
+/**
+ * 리뷰 타입 정의
+ */
+
+export interface Review {
+  id: string;
+  orderId: string;
+  userId: string;
+  userDisplayName: string;
+  rating: number; // 1-5
+  comment: string;
+  images?: string[];
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
+export interface CreateReviewData extends Omit<Review, 'id' | 'createdAt' | 'updatedAt'> { }
+
+export interface UpdateReviewData extends Partial<Omit<Review, 'id' | 'orderId' | 'userId' | 'createdAt'>> { }
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\types\store.ts
+
+Size: 2.45 KB
+
+```
+/**
+ * 상점(Store) 타입 정의
+ * 단일 레스토랑 앱을 위한 단순화된 구조
+ */
+
+export interface Store {
+  id: string; // 단일 문서 ID (예: 'store')
+  name: string;
+  description: string;
+
+  // 연락처 정보
+  phone: string;
+  email: string;
+  address: string;
+
+  // 브랜딩
+  logoUrl?: string;
+  bannerUrl?: string;
+  primaryColor?: string; // 메인 테마 색상
+
+  // 운영 정보
+  businessHours?: BusinessHours;
+  deliveryFee: number;
+  minOrderAmount: number;
+
+  // 설정
+  settings: StoreSettings;
+
+  // 메타데이터
+  createdAt: any; // Firestore Timestamp
+  updatedAt: any; // Firestore Timestamp
+
+  // 매장 일시정지 (v3.0 - Top Level)
+  isOrderingPaused?: boolean;
+  pausedReason?: string;
+}
+
+export interface BusinessHours {
+  monday?: DayHours;
+  tuesday?: DayHours;
+  wednesday?: DayHours;
+  thursday?: DayHours;
+  friday?: DayHours;
+  saturday?: DayHours;
+  sunday?: DayHours;
+}
+
+export interface DayHours {
+  open: string; // "09:00"
+  close: string; // "22:00"
+  closed: boolean; // 휴무일 여부
+}
+
+export interface StoreSettings {
+  // 주문 설정
+  autoAcceptOrders: boolean; // 자동 주문 접수
+  estimatedDeliveryTime: number; // 예상 배달 시간 (분)
+
+  // 결제 설정
+  paymentMethods: PaymentMethod[];
+
+  // 알림 설정
+  notificationEmail?: string;
+  notificationPhone?: string;
+
+  // 기능 활성화
+  enableReviews: boolean;
+  enableCoupons: boolean;
+  enableNotices: boolean;
+  enableEvents: boolean;
+  // 배달 대행 설정 (v2.0)
+  deliverySettings?: DeliverySettings;
+
+  // 매장 일시정지 (v3.0)
+  isOrderingPaused?: boolean;
+  pausedReason?: string;
+}
+
+export interface DeliverySettings {
+  provider: 'manual' | 'barogo' | 'vroong' | 'mesh'; // 'manual' = 자체배달
+  apiKey?: string;
+  apiSecret?: string;
+  shopId?: string; // 대행사측 상점 ID
+  webhookUrl?: string; // 대행사 -> 앱 상태 업데이트용 (자동생성/표시용)
+}
+
+export type PaymentMethod = '앱결제' | '만나서카드' | '만나서현금' | '방문시결제';
+
+/**
+ * 상점 설정 폼 데이터
+ */
+export interface StoreFormData {
+  name: string;
+  description: string;
+  phone: string;
+  email: string;
+  address: string;
+  deliveryFee: number;
+  minOrderAmount: number;
+  logoUrl?: string;
+  bannerUrl?: string;
+  businessHours?: BusinessHours;
+  settings?: StoreSettings;
+  isOrderingPaused?: boolean;
+  pausedReason?: string;
+}
+
+export interface UpdateStoreFormData extends StoreFormData {
+  primaryColor?: string;
+}
+
+```
+
+---
+
+## D:\projectsing\S-Delivery-AppV3\src\types\user.ts
+
+Size: 0.18 KB
+
+```
+export interface User {
+    id: string;
+    email: string;
+    displayName?: string;
+    phone?: string;
+    photoURL?: string;
+    role?: 'user' | 'admin';
+    createdAt?: any;
+}
+
+```
+
+---
+
