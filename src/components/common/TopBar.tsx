@@ -12,6 +12,11 @@ export default function TopBar() {
   const { store } = useStore();
   const { getTotalItems } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  const fallbackLogo = '/assets/brands/onjok/logo.png';
+  const logoSrc = store?.logoUrl || fallbackLogo;
+
   const cartItemsCount = getTotalItems();
 
   const handleLogout = async () => {
@@ -26,10 +31,11 @@ export default function TopBar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 group">
-            {store?.logoUrl ? (
+            {!imgError && logoSrc ? (
               <img
-                src={store.logoUrl}
-                alt={store.name}
+                src={logoSrc}
+                alt={store?.name || '온족'}
+                onError={() => setImgError(true)}
                 className="w-10 h-10 rounded-xl object-cover border border-gray-100 shadow-sm transform group-hover:scale-105 transition-transform"
               />
             ) : (
