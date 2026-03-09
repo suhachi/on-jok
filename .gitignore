@@ -39,3 +39,5 @@ ui-debug.log
 build/
 *.tsbuildinfo
 
+# Raw assets
+docs/_assets_raw/
