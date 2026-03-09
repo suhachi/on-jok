@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../contexts/StoreContext';
 
@@ -9,6 +9,10 @@ import { useStore } from '../contexts/StoreContext';
 export default function WelcomePage() {
   const navigate = useNavigate();
   const { store } = useStore();
+  const [imgError, setImgError] = useState(false);
+
+  const fallbackLogo = '/assets/brands/onjok/logo.png';
+  const logoSrc = store?.logoUrl || fallbackLogo;
 
   useEffect(() => {
     // 2초 후 메뉴 페이지로 자동 이동
@@ -22,11 +26,11 @@ export default function WelcomePage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white p-4 animate-fade-in">
       {/* 로고 또는 대표 이미지 */}
-      {/* 로고 또는 대표 이미지 */}
-      {store?.logoUrl ? (
+      {!imgError && logoSrc ? (
         <img
-          src={store.logoUrl}
-          alt={store.name}
+          src={logoSrc}
+          alt={store?.name || '온족'}
+          onError={() => setImgError(true)}
           className="w-48 h-48 md:w-64 md:h-64 mb-8 rounded-3xl object-cover shadow-lg transform hover:scale-105 transition-transform duration-500"
         />
       ) : (
