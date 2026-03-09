@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../../contexts/StoreContext';
 
 export default function StoreInfo() {
@@ -26,23 +26,64 @@ export default function StoreInfo() {
 
     const hasPromoImages = promoImages && promoImages.length > 0;
     const hasPromoText = Boolean(promoTitle || promoText);
+    const n = promoImages?.length || 0;
+
+    const promoRef = useRef<HTMLDivElement>(null);
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    // P1-1: 2초 자동 슬라이드 로직
+    useEffect(() => {
+        if (n < 2) return;
+
+        const interval = setInterval(() => {
+            setActiveIndex((prev) => {
+                const nextIndex = (prev + 1) % n;
+                if (promoRef.current) {
+                    const width = promoRef.current.clientWidth;
+                    if (width > 0) {
+                        promoRef.current.scrollTo({ left: nextIndex * width, behavior: 'smooth' });
+                    }
+                }
+                return nextIndex;
+            });
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [n]);
+
+    // 사용자 수동 스와이프 동기화
+    const handleScroll = () => {
+        if (!promoRef.current) return;
+        const width = promoRef.current.clientWidth;
+        if (width === 0) return;
+
+        const scrollLeft = promoRef.current.scrollLeft;
+        const newIndex = Math.round(scrollLeft / width);
+        if (newIndex !== activeIndex) {
+            setActiveIndex(newIndex);
+        }
+    };
 
     return (
         <div className="bg-white px-4 py-5 mb-2 shadow-sm overflow-hidden">
-            {/* P1: StorePromo 홍보 이미지 캐러셀/배너 */}
+            {/* P1-1: StorePromo 홍보 이미지 캐러셀/배너 (1장 단독 + 자동 슬라이드) */}
             {hasPromoImages && (
-                <div className="mb-6 -mx-4 px-4 overflow-x-auto snap-x snap-mandatory flex gap-3 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                    {promoImages.length === 1 ? (
-                        <div className="w-full shrink-0 snap-center rounded-xl overflow-hidden shadow-sm">
-                            <img src={promoImages[0]} alt="가게 홍보 이미지" className="w-full aspect-video object-cover" />
-                        </div>
-                    ) : (
-                        promoImages.map((url, idx) => (
-                            <div key={idx} className="w-[85%] shrink-0 snap-center rounded-xl overflow-hidden shadow-sm">
-                                <img src={url} alt={`가게 홍보 이미지 ${idx + 1}`} className="w-full aspect-video object-cover" />
+                <div
+                    ref={promoRef}
+                    onScroll={handleScroll}
+                    className="mb-6 -mx-4 flex overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                >
+                    {promoImages.map((url, idx) => (
+                        <div key={idx} className="w-full shrink-0 snap-center px-4">
+                            <div className="w-full rounded-xl overflow-hidden shadow-sm bg-gray-100">
+                                <img
+                                    src={url}
+                                    alt={n === 1 ? "가게 홍보 이미지" : `가게 홍보 이미지 ${idx + 1}`}
+                                    className="w-full aspect-video object-cover"
+                                />
                             </div>
-                        ))
-                    )}
+                        </div>
+                    ))}
                 </div>
             )}
 
