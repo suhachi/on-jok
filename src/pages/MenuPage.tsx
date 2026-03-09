@@ -18,7 +18,7 @@ export default function MenuPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Firestore에서 메뉴 조회
-  const { data: menus, loading } = useFirestoreCollection<Menu>(
+  const { data: menus } = useFirestoreCollection<Menu>(
     storeId ? getAllMenusQuery(storeId) : null
   );
 

@@ -74,7 +74,7 @@ export default function StoreInfo() {
                     className="mb-6 -mx-4 flex overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                 >
                     {promoImages.map((url, idx) => (
-                        <div key={idx} className="w-full shrink-0 snap-center px-4">
+                        <div key={idx} style={{ flex: '0 0 100%' }} className="snap-center px-4">
                             <div className="w-full rounded-xl overflow-hidden shadow-sm bg-gray-100">
                                 <img
                                     src={url}
